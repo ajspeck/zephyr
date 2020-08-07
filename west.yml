@@ -55,7 +55,7 @@ manifest:
       path: modules/hal/cypress
     - name: hal_infineon
       remote: ajspeck
-      revision: 86f0fef9758adc63f90fb14d82f2da545355d12a
+      revision: xmc4700
       path: modules/hal/infineon
     - name: hal_nordic
       revision: 8139a8445900ddbf495f65de21ddeab31ac97951

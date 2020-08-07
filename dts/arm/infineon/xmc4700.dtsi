@@ -9,15 +9,14 @@
 #include <infineon/xmc4xxx.dtsi>
 
 / {
-
 	sysclk: system-clock {
 		compatible = "fixed-clock";
-		clock-frequency = <120000000>;
+		clock-frequency = <144000000>;
 		#clock-cells = <0>;
 	};
 	
 	/* TODO: Add psram1 & dsram2 to MEMORY layout of linker */
-	psram1: memory@10000000 {
+	psram1: memory@1FFE8000 {
 		compatible = "mmio-sram";
 	};
 
@@ -25,25 +24,30 @@
 		compatible = "mmio-sram";
 	};
 
-	dsram2: memory@30000000 {
+	dsram2: memory@20020000 {
 		compatible = "mmio-sram";
 	};
 
 	flash0: serial-flash@c000000 {
 		compatible = "serial-flash";
 	};
+
+};
+
+&nvic {
+	arm,num-irq-priority-bits = <6>;
 };
 
 &psram1 {
-	reg = <0x10000000 DT_SIZE_K(64)>;
+	reg = <0x1FFE8000 DT_SIZE_K(96)>;
 };
 
 &dsram1 {
-	reg = <0x20000000 DT_SIZE_K(64)>;
+	reg = <0x20000000 DT_SIZE_K(96)>;
 };
 
 &dsram2 {
-	reg = <0x30000000 DT_SIZE_K(32)>;
+	reg = <0x20020000 DT_SIZE_K(128)>;
 };
 
 &flash0 {

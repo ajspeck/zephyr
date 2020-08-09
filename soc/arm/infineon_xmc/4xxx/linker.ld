@@ -11,4 +11,7 @@
  * This is the linker script for both standard images and XIP images.
  */
 
+#define DSRAM2_SIZE (96 * 1K)
+#define DSRAM2_ADDR 0x20020000
+
 #include <arch/arm/aarch32/cortex_m/scripts/linker.ld>

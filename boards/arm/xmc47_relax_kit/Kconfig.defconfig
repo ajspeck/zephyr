@@ -8,4 +8,14 @@ if BOARD_XMC47_RELAX_KIT
 config BOARD
 	default "xmc47_relax_kit"
 
+if NETWORKING
+
+config NET_L2_ETHERNET
+	default y
+
+config ETH_XMC4XXX
+    default y
+
+endif # NETWORKING
+
 endif # BOARD_XMC47_RELAX_KIT

@@ -1,0 +1,12 @@
+# ETH_XMC4XXX Ethernet driver configuration options
+
+# Copyright (c) 2020 SLB
+# SPDX-License-Identifier: Apache-2.0
+
+DT_COMPAT_XMC4XXX_ETHERNET := xmc,xmc4xxx_ethernet
+
+menuconfig ETH_XMC4XXX
+	bool "Enable XMC4XXX family ethernet driver."
+	default y if $(dt_compat_enabled,$(DT_COMPAT_XMC4XXX_ETHERNET))
+	help
+	  XMC4XXX on-board Ethernet Controller

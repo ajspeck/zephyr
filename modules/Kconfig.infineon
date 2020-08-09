@@ -15,4 +15,8 @@ config HAS_XMCLIB_UART
 	help
 	  Enable XMCLIB Universal asynchronous receiver transmitter (UART)
 
+config HAS_XMCLIB_ETH_PHY_KSZ8081RNB
+    bool
+	help
+	  Enable XMCLIB Ethernet PHY KSZ8081RNB
 endif # HAS_XMCLIB

@@ -5,3 +5,8 @@
 
 zephyr_sources(soc.c)
 zephyr_linker_sources(NOINIT noinit.ld)
+
+zephyr_linker_sources_ifdef(CONFIG_XMC4XXX_COMMS
+  SECTIONS
+  xmc_4xxx_comms.ld
+  )

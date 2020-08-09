@@ -106,6 +106,9 @@ MEMORY
     SRAM1                 (rw) : ORIGIN = RAM1_ADDR, LENGTH = RAM1_SIZE
     SRAM2                 (rw) : ORIGIN = RAM2_ADDR, LENGTH = RAM2_SIZE
 #endif
+#ifdef CONFIG_XMC4XXX_COMMS
+    DSRAM2                (rw) : ORIGIN = DSRAM2_ADDR, LENGTH = DSRAM2_SIZE
+#endif
     /* Used by and documented in include/linker/intlist.ld */
     IDT_LIST  (wx)      : ORIGIN = (RAM_ADDR + RAM_SIZE), LENGTH = 2K
     }

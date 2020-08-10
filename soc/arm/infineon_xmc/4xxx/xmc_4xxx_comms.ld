@@ -1,1 +1,1 @@
-ETH_RAM (NOLOAD) : { _sETH_RAM = .; *(ETH_RAM); _eETH_RAM = .; } >DSRAM2
+ETH_RAM : { _sETH_RAM = .; *(ETH_RAM); _eETH_RAM = .; } >DSRAM2

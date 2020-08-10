@@ -102,7 +102,7 @@ __extension__ ({							\
 	struct  __attribute__((__packed__)) {				\
 		__typeof__(*(p)) __v;					\
 	} *__p = (__typeof__(__p)) (p);					\
-	__p->__v;							\
+	__p->__v;	 \
 })
 
 

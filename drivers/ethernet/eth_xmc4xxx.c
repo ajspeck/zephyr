@@ -42,13 +42,13 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #if defined(__GNUC__)
 static __attribute__((aligned(4))) XMC_ETH_MAC_DMA_DESC_t ETH_LWIP_0_rx_desc[ETH_LWIP_0_NUM_RX_BUF] __attribute__((section ("ETH_RAM")));
 static __attribute__((aligned(4))) XMC_ETH_MAC_DMA_DESC_t ETH_LWIP_0_tx_desc[ETH_LWIP_0_NUM_TX_BUF] __attribute__((section ("ETH_RAM")));
-static __attribute__((aligned(4))) uint8_t ETH_LWIP_0_rx_buf[ETH_LWIP_0_NUM_RX_BUF][XMC_ETH_MAC_BUF_SIZE] __attribute__((section ("ETH_RAM")));
-static __attribute__((aligned(4))) uint8_t ETH_LWIP_0_tx_buf[ETH_LWIP_0_NUM_TX_BUF][XMC_ETH_MAC_BUF_SIZE] __attribute__((section ("ETH_RAM")));
+static __attribute__((aligned(4))) uint8_t ETH_LWIP_0_rx_buf[ETH_LWIP_0_NUM_RX_BUF][ETH_RX_BUF_SIZE] __attribute__((section ("ETH_RAM")));
+static __attribute__((aligned(4))) uint8_t ETH_LWIP_0_tx_buf[ETH_LWIP_0_NUM_TX_BUF][ETH_TX_BUF_SIZE] __attribute__((section ("ETH_RAM")));
 #else
 static __attribute__((aligned(4))) XMC_ETH_MAC_DMA_DESC_t ETH_LWIP_0_rx_desc[ETH_LWIP_0_NUM_RX_BUF];
 static __attribute__((aligned(4))) XMC_ETH_MAC_DMA_DESC_t ETH_LWIP_0_tx_desc[ETH_LWIP_0_NUM_TX_BUF];
-static __attribute__((aligned(4))) uint8_t ETH_LWIP_0_rx_buf[ETH_LWIP_0_NUM_RX_BUF][XMC_ETH_MAC_BUF_SIZE];
-static __attribute__((aligned(4))) uint8_t ETH_LWIP_0_tx_buf[ETH_LWIP_0_NUM_TX_BUF][XMC_ETH_MAC_BUF_SIZE];
+static __attribute__((aligned(4))) uint8_t ETH_LWIP_0_rx_buf[ETH_LWIP_0_NUM_RX_BUF][ETH_RX_BUF_SIZE];
+static __attribute__((aligned(4))) uint8_t ETH_LWIP_0_tx_buf[ETH_LWIP_0_NUM_TX_BUF][ETH_TX_BUF_SIZE];
 #endif
 const XMC_ETH_PHY_CONFIG_t eth_phy_config =
 {
@@ -155,21 +155,31 @@ static struct net_pkt *eth_xmc4xxx_rx_pkt(struct device *dev,
 {
 	struct eth_xmc4xxx_runtime *dev_data;
 	struct net_pkt *pkt = NULL;
+	uint8_t buffer[ETH_RX_BUF_SIZE];
 	size_t total_len;
 	__ASSERT_NO_MSG(dev != NULL);
 	dev_data = DEV_DATA(dev);
 	__ASSERT_NO_MSG(dev_data != NULL);
 
-
+/*
+		len = XMC_ETH_MAC_GetRxFrameSize(&eth_mac);
+		
+*/
     if (XMC_ETH_MAC_IsRxDescriptorOwnedByDma(&eth_mac) == false) {
         /* while (1) { */
-        uint8_t *buf_eth;
+        //uint8_t *buf_eth;
         total_len = XMC_ETH_MAC_GetRxFrameSize(&eth_mac);
-        if (total_len < 0)
-            goto done;
-        buf_eth = XMC_ETH_MAC_GetRxBuffer(&eth_mac);
+        if ((total_len < 0) || (total_len>ETH_RX_BUF_SIZE))
+		{
+			XMC_ETH_MAC_ReturnRxDescriptor(&eth_mac);  
+    		XMC_ETH_MAC_ResumeRx(&eth_mac);
+			goto done;
+		}
+		XMC_ETH_MAC_ReadFrame(&eth_mac, &buffer[0], total_len);
+        /*buf_eth = XMC_ETH_MAC_GetRxBuffer(&eth_mac);
         if (!buf_eth)
             goto done;
+		*/
 		pkt = net_pkt_rx_alloc_with_buffer(get_iface(dev_data, *vlan_tag),
 						total_len, AF_UNSPEC, 0, K_NO_WAIT);
 		if (!pkt) {
@@ -177,7 +187,7 @@ static struct net_pkt *eth_xmc4xxx_rx_pkt(struct device *dev,
 			goto done;
 		}
 
-		if (net_pkt_write(pkt, buf_eth, total_len)) {
+		if (net_pkt_write(pkt, (&buffer[0]), total_len)) {
 			LOG_ERR("Failed to append RX buffer to context buffer");
 			net_pkt_unref(pkt);
 			pkt = NULL;
@@ -185,8 +195,6 @@ static struct net_pkt *eth_xmc4xxx_rx_pkt(struct device *dev,
 		}
     }
 done:
-    XMC_ETH_MAC_ReturnRxDescriptor(&eth_mac);  
-    XMC_ETH_MAC_ResumeRx(&eth_mac);
     return pkt;
 
 }
@@ -246,9 +254,20 @@ static void eth_xmc4xxx_isr(void *arg)
 	uint32_t lock;
 
 	lock = irq_lock();
+  	uint32_t status;
+
+	status = XMC_ETH_MAC_GetEventStatus(&eth_mac);
+
+	if (status & XMC_ETH_MAC_EVENT_RECEIVE)
+	{
+		XMC_ETH_MAC_DisableEvent(&eth_mac, XMC_ETH_MAC_EVENT_RECEIVE);
+		eth_xmc4xxx_rx(dev);
+		XMC_ETH_MAC_EnableEvent(&eth_mac, XMC_ETH_MAC_EVENT_RECEIVE);
+	}
+
+	XMC_ETH_MAC_ClearEventStatus(&eth_mac, status);
+
 	/* Acknowledge the interrupt. */
-	XMC_ETH_MAC_ClearEventStatus(&eth_mac, XMC_ETH_MAC_EVENT_RECEIVE);
-	eth_xmc4xxx_rx(dev);
 	irq_unlock(lock);
 }
 
@@ -257,7 +276,7 @@ static void eth_xmc4xxx_init(struct net_if *iface)
 	struct device *dev = net_if_get_device(iface);
 	//const struct eth_xmc4xxx_config *dev_conf = DEV_CFG(dev);
 	struct eth_xmc4xxx_runtime *dev_data = DEV_DATA(dev);
-
+	const struct eth_xmc4xxx_config *dev_conf = DEV_CFG(dev);
 	dev_data->iface = iface;
 
 	/* Assign link local address. */
@@ -269,6 +288,9 @@ static void eth_xmc4xxx_init(struct net_if *iface)
 	/* Initialize semaphore. */
 	k_sem_init(&dev_data->tx_sem, 0, 1);
 	k_mutex_init(&dev_data->tx_mutex);
+
+	/* Initialize Interrupts. */
+	dev_conf->config_func(dev);
 
     XMC_ETH_LINK_SPEED_t speed;
     XMC_ETH_LINK_DUPLEX_t duplex;

@@ -22,11 +22,20 @@ struct uart_xmc4xxx_data {
 
 static int uart_xmc4xxx_poll_in(struct device *dev, unsigned char *c)
 {
+	uint16_t temp_c;
 	const struct uart_device_config *config = DEV_CFG(dev);
-
-	*(uint16_t *)c =
+  	if ((XMC_UART_CH_GetStatusFlag((XMC_USIC_CH_t *)config->base) & (XMC_UART_CH_STATUS_FLAG_ALTERNATIVE_RECEIVE_INDICATION |
+                                                      XMC_UART_CH_STATUS_FLAG_RECEIVE_INDICATION)) == 0)
+	{
+		return -1;
+	}
+	
+	temp_c =
 		XMC_UART_CH_GetReceivedData((XMC_USIC_CH_t *)config->base);
 
+	XMC_UART_CH_ClearStatusFlag((XMC_USIC_CH_t *)config->base, XMC_UART_CH_STATUS_FLAG_ALTERNATIVE_RECEIVE_INDICATION |
+                                             XMC_UART_CH_STATUS_FLAG_RECEIVE_INDICATION);
+	*c = (uint8_t)temp_c;
 	return 0;
 }
 

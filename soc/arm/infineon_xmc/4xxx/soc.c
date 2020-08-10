@@ -18,6 +18,20 @@
 void z_platform_init(void)
 {
 	uint32_t temp;
+  /* __FPU_PRESENT = 1 defined in device header file */
+  /* __FPU_USED value depends on compiler/linker options. */
+  /* __FPU_USED = 0 if -mfloat-abi=soft is selected */
+  /* __FPU_USED = 1 if -mfloat-abi=softfp or –mfloat-abi=hard */
+
+#if ((__FPU_PRESENT == 1) && (__FPU_USED == 1))
+  SCB->CPACR |= ((3UL << 10*2) |                 /* set CP10 Full Access */
+                 (3UL << 11*2)  );               /* set CP11 Full Access */
+#else
+  SCB->CPACR = 0;
+#endif
+
+  /* Enable unaligned memory access - SCB_CCR.UNALIGN_TRP = 0 */
+  SCB->CCR &= ~(SCB_CCR_UNALIGN_TRP_Msk);
 
 	/* setup flash wait state */
 	temp = FLASH0->FCON;

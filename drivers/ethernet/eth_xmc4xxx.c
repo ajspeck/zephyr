@@ -36,8 +36,8 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #define ETH_LWIP_0_PIN_LIST_SIZE 10U
 #define ETH_LWIP_0_PHY_ADDR   (0)
 
-#define ETH_LWIP_0_NUM_RX_BUF (4U)
-#define ETH_LWIP_0_NUM_TX_BUF (4U)
+#define ETH_LWIP_0_NUM_RX_BUF (8U)
+#define ETH_LWIP_0_NUM_TX_BUF (8U)
 #define ETH_LWIP_PHY_MAX_RETRIES  0xfffffU
 #if defined(__GNUC__)
 static __attribute__((aligned(4))) XMC_ETH_MAC_DMA_DESC_t ETH_LWIP_0_rx_desc[ETH_LWIP_0_NUM_RX_BUF] __attribute__((section ("ETH_RAM")));
@@ -77,7 +77,50 @@ static void eth_xmc4xxx_assign_mac(struct device *dev)
 	value |= mac_addr[3] << 24;
 	value |= ((uint64_t)(mac_addr[4])) << 32;
 	value |= ((uint64_t)(mac_addr[5])) << 40;
+  	eth_mac.address = value;
+
 	XMC_ETH_MAC_SetAddress(&eth_mac, value);
+}
+
+/* Get RX frame size */
+bool XMC_ETH_MAC_ClearLargeFrames(XMC_ETH_MAC_t *const eth_mac)
+{
+  uint32_t status;
+
+  status = eth_mac->rx_desc[eth_mac->rx_index].status;
+
+  if (status & ETH_MAC_DMA_RDES0_OWN)
+  {
+    /* Owned by DMA */
+    return false;
+  }
+  if ((status & ETH_MAC_DMA_RDES0_ES) != 0U)
+  {
+	  return false;
+  }
+  if ((status & ETH_MAC_DMA_RDES0_FS) == 0U)
+  {
+	  return false;
+  }
+  int i = 0;
+  while (((status & ETH_MAC_DMA_RDES0_LS) == 0U) && (i<ETH_LWIP_0_NUM_RX_BUF))
+  {
+		if (status & ETH_MAC_DMA_RDES0_OWN)
+		{
+			/* Owned by DMA */
+			return false;
+		}
+		i++;
+		eth_mac->rx_desc[eth_mac->rx_index].status = (uint32_t)ETH_MAC_DMA_RDES0_OWN;
+		XMC_ETH_MAC_ReturnRxDescriptor(eth_mac);
+		status = eth_mac->rx_desc[eth_mac->rx_index].status;  
+  }
+  if ((!(status & ETH_MAC_DMA_RDES0_OWN)) && ((status & ETH_MAC_DMA_RDES0_LS) != 0U))
+  {
+		eth_mac->rx_desc[eth_mac->rx_index].status = (uint32_t)ETH_MAC_DMA_RDES0_OWN;
+	  	XMC_ETH_MAC_ReturnRxDescriptor(eth_mac);
+  }
+  return true;
 }
 
 static struct net_if *get_iface(struct eth_xmc4xxx_runtime *ctx,
@@ -171,15 +214,18 @@ static struct net_pkt *eth_xmc4xxx_rx_pkt(struct device *dev,
         total_len = XMC_ETH_MAC_GetRxFrameSize(&eth_mac);
         if ((total_len < 0) || (total_len>ETH_RX_BUF_SIZE))
 		{
+			total_len = XMC_ETH_MAC_GetRxFrameSize(&eth_mac);
 			XMC_ETH_MAC_ReturnRxDescriptor(&eth_mac);  
     		XMC_ETH_MAC_ResumeRx(&eth_mac);
 			goto done;
 		}
 		XMC_ETH_MAC_ReadFrame(&eth_mac, &buffer[0], total_len);
+    	XMC_ETH_MAC_ResumeRx(&eth_mac);
         /*buf_eth = XMC_ETH_MAC_GetRxBuffer(&eth_mac);
         if (!buf_eth)
             goto done;
 		*/
+	
 		pkt = net_pkt_rx_alloc_with_buffer(get_iface(dev_data, *vlan_tag),
 						total_len, AF_UNSPEC, 0, K_NO_WAIT);
 		if (!pkt) {
@@ -326,8 +372,6 @@ static struct net_stats_eth *eth_xmc4xxx_stats(struct device *dev)
 static int eth_xmc4xxx_dev_init(struct device *dev)
 {
 
-	/* Assign MAC address to Hardware */
-	eth_xmc4xxx_assign_mac(dev);
     XMC_ETH_MAC_PORT_CTRL_t port_control;
     XMC_GPIO_CONFIG_t gpio_config;
     gpio_config.output_level = XMC_GPIO_OUTPUT_LEVEL_LOW;
@@ -365,6 +409,8 @@ static int eth_xmc4xxx_dev_init(struct device *dev)
     port_control.mdio = (XMC_ETH_MAC_PORT_CTRL_MDIO_t)1U;
     XMC_ETH_MAC_SetPortControl(&eth_mac, port_control);
     (void)XMC_ETH_MAC_Init(&eth_mac);
+	/* Assign MAC address to Hardware */
+	eth_xmc4xxx_assign_mac(dev);
     XMC_ETH_MAC_DisableJumboFrame(&eth_mac);
     XMC_ETH_MAC_EnableReceptionBroadcastFrames(&eth_mac);
 
@@ -379,6 +425,7 @@ static void eth_xmc4xxx_irq_config(struct device *dev)
 	IRQ_CONNECT(DT_INST_IRQN(0),
 		    DT_INST_IRQ(0, priority),
 		    eth_xmc4xxx_isr, DEVICE_GET(eth_xmc4xxx), 0);
+	NVIC_SetPriority(ETH0_0_IRQn, NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 63U, 0U));
 	irq_enable(DT_INST_IRQN(0));
 }
 

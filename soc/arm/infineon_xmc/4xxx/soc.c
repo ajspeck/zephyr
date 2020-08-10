@@ -38,7 +38,10 @@ void z_platform_init(void)
 	temp &= ~FLASH_FCON_WSPFLASH_Msk;
 	temp |= PMU_FLASH_WS;
 	FLASH0->FCON = temp;
-
+  XMC_SCU_CLOCK_SetSleepConfig(XMC_SCU_CLOCK_SLEEP_MODE_CONFIG_SYSCLK_FPLL || XMC_SCU_CLOCK_SLEEP_MODE_CONFIG_ENABLE_ETH);
+  
+  // Make sure that SLEEPDEEP bit is cleared
+  SCB->SCR &= ~ SCB_SCR_SLEEPDEEP_Msk;
 	/* configure PLL & system clock */
 	SystemCoreClockSetup();
 }

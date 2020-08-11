@@ -306,12 +306,13 @@ static void eth_xmc4xxx_isr(void *arg)
 
 	if (status & XMC_ETH_MAC_EVENT_RECEIVE)
 	{
-		XMC_ETH_MAC_DisableEvent(&eth_mac, XMC_ETH_MAC_EVENT_RECEIVE);
+		//XMC_ETH_MAC_DisableEvent(&eth_mac, XMC_ETH_MAC_EVENT_RECEIVE);
+		XMC_ETH_MAC_ClearEventStatus(&eth_mac, status);
 		eth_xmc4xxx_rx(dev);
-		XMC_ETH_MAC_EnableEvent(&eth_mac, XMC_ETH_MAC_EVENT_RECEIVE);
+		//XMC_ETH_MAC_EnableEvent(&eth_mac, XMC_ETH_MAC_EVENT_RECEIVE);
 	}
 
-	XMC_ETH_MAC_ClearEventStatus(&eth_mac, status);
+	//XMC_ETH_MAC_ClearEventStatus(&eth_mac, status);
 
 	/* Acknowledge the interrupt. */
 	irq_unlock(lock);
@@ -413,6 +414,10 @@ static int eth_xmc4xxx_dev_init(struct device *dev)
 	eth_xmc4xxx_assign_mac(dev);
     XMC_ETH_MAC_DisableJumboFrame(&eth_mac);
     XMC_ETH_MAC_EnableReceptionBroadcastFrames(&eth_mac);
+	for (int i = 0U; i < eth_mac.num_tx_buf; ++i)
+  	{
+  		eth_mac.tx_desc[i].status |= ETH_MAC_DMA_TDES0_CIC;
+	}
 
 	return 0;
 }
@@ -441,9 +446,21 @@ struct eth_xmc4xxx_runtime eth_data = {
 	.tx_pos = 0,
 };
 
+static enum ethernet_hw_caps eth_xmc4xxx_capabilities(struct device *dev)
+{
+	ARG_UNUSED(dev);
+
+	return ETHERNET_LINK_10BASE_T | ETHERNET_LINK_100BASE_T | ETHERNET_HW_TX_CHKSUM_OFFLOAD
+#if defined(CONFIG_NET_VLAN)
+		| ETHERNET_HW_VLAN
+#endif
+		;
+}
+
 static const struct ethernet_api eth_xmc4xxx_apis = {
 	.iface_api.init	= eth_xmc4xxx_init,
 	.send =  eth_xmc4xxx_send,
+	.get_capabilities = eth_xmc4xxx_capabilities,
 #if defined(CONFIG_NET_STATISTICS_ETHERNET)
 	.get_stats = eth_xmc4xxx_stats,
 #endif
